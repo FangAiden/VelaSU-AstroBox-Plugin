@@ -37,8 +37,7 @@ func buildMainUI(snapshot DebugState) *ui.Element {
 	main := makeColumn().
 		WidthFull().
 		Padding(12).
-		Gap(10).
-		Bg("#090E1B")
+		Gap(10)
 
 	if snapshot.CurrentAppRoute == RouteDashboard {
 		main = main.Child(applyPageMotion(RouteDashboard, buildHomeDashboard(snapshot)))
