@@ -64,7 +64,7 @@ func buildTerminalPanel(snapshot DebugState) *ui.Element {
 		WidthFull().
 		Height(320).
 		Padding(4).
-		ScrollBehavior("smooth").
+		ScrollBehavior("auto").
 		ScrollTop(terminalScrollBottom)
 
 	outputText := terminalOutputText(allLines)
@@ -79,6 +79,8 @@ func buildTerminalPanel(snapshot DebugState) *ui.Element {
 	cmdInput := el(ui.ElementTypeInput, snapshot.CurrentCommand).
 		WithoutDefaultStyles().
 		FlexGrow(1).
+		Autofocus().
+		TabIndex(0).
 		Bg("#0E1424").
 		TextColor("#ECF2FF").
 		Border(1, "#2E3852").

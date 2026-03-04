@@ -53,13 +53,11 @@ func OnCardRender(cardID string) {
 
 func shouldRerenderAfterUIEvent(event ui.Event, eventID string, eventPayload string) bool {
 	if event == ui.EventInput || event == ui.EventChange {
-		if eventID == EventTerminalKeyDown {
-			payload, ok := parseUIEventPayload(eventPayload)
-			if !ok {
-				return false
-			}
-			return strings.EqualFold(payload.Key, "Enter")
-		}
+		_ = eventID
+		_ = eventPayload
+		return false
+	}
+	if event == ui.EventClick && eventID == EventExecCommand {
 		return false
 	}
 	return true
