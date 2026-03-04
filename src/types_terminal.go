@@ -7,14 +7,8 @@ type TerminalHistoryEntry struct {
 	Timestamp string
 }
 
-type TerminalFavorite struct {
-	Name    string
-	Command string
-}
-
 type TerminalViewModel struct {
 	CommandInput string
 	LastOutput   string
 	History      []TerminalHistoryEntry
-	Favorites    []TerminalFavorite
 }

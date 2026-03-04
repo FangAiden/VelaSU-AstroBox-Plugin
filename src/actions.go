@@ -57,12 +57,8 @@ func HandleUIEvent(eventID string, event ui.Event, eventPayload string) {
 		actionExecCommand()
 	case eventID == EventTerminalClear:
 		actionTerminalClear()
-	case eventID == EventTerminalAddFavorite:
-		actionTerminalAddFavorite()
 	case strings.HasPrefix(eventID, EventTerminalHistoryRunPrefix):
 		actionTerminalRunHistory(parseSuffixIndex(eventID, EventTerminalHistoryRunPrefix))
-	case strings.HasPrefix(eventID, EventTerminalFavoriteRunPrefix):
-		actionTerminalRunFavorite(parseSuffixIndex(eventID, EventTerminalFavoriteRunPrefix))
 	case eventID == EventTerminalExportText:
 		actionTerminalExportText()
 

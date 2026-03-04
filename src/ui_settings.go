@@ -12,8 +12,8 @@ func buildSettingsOnlyRoot(snapshot DebugState) *ui.Element {
 	root = root.Child(makePanel().
 		Bg("#10172A").
 		Padding(12).
-		Child(makeSectionTitle("设备状态")).
-		Child(makeMutedText("当前设备: " + formatSelectedDevice(snapshot)).MarginTop(6)).
+		Child(makeSectionTitle("设备状态").MarginRight(4)).
+		Child(makeMutedText("当前设备: " + formatSelectedDevice(snapshot)).MarginTop(6).MarginRight(4)).
 		Child(makeMutedText("已连接设备数: " + itoa(len(snapshot.ConnectedDevices))).MarginTop(4)))
 
 	tokenCard := makePanel().
@@ -31,11 +31,11 @@ func buildSettingsOnlyRoot(snapshot DebugState) *ui.Element {
 		Padding(12).
 		Child(makeSectionTitle("连接操作")).
 		Child(makeRow().Gap(8).MarginTop(8).
-			Child(makeSecondaryButton("刷新设备", EventDeviceRefresh).FlexGrow(1)).
-			Child(makeSecondaryButton("启动快应用", EventLaunchQA).FlexGrow(1))).
+			Child(makeSecondaryButton("刷新设备", EventDeviceRefresh).Width(0).MinWidth(0).FlexGrow(1)).
+			Child(makeSecondaryButton("启动快应用", EventLaunchQA).Width(0).MinWidth(0).FlexGrow(1))).
 		Child(makeRow().Gap(8).MarginTop(8).
-			Child(makeSecondaryButton("注册服务", EventRegisterInterconnect).FlexGrow(1)).
-			Child(makePrimaryButton("测试连接", EventHello).FlexGrow(1)))
+			Child(makeSecondaryButton("注册服务", EventRegisterInterconnect).Width(0).MinWidth(0).FlexGrow(1)).
+			Child(makePrimaryButton("测试连接", EventHello).Width(0).MinWidth(0).FlexGrow(1)))
 	root = root.Child(actions)
 
 	if len(snapshot.ConnectedDevices) > 0 {

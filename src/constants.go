@@ -11,7 +11,7 @@ const (
 	LogPageSize       = 15
 	TerminalPageSize  = 15
 
-	DefaultCommand = "pwd"
+	DefaultCommand = ""
 
 	RouteDashboard = "dashboard"
 	RouteTerminal  = "terminal"
@@ -19,8 +19,7 @@ const (
 	RouteSettings  = "settings"
 	RouteLogs      = "logs"
 
-	MaxTerminalHistory   = 80
-	MaxTerminalFavorites = 20
+	MaxTerminalHistory = 80
 
 	DefaultFileDir       = "/data"
 	DefaultDirPageSize   = 100
@@ -32,9 +31,3 @@ const (
 
 	timerPayloadPrefix = "rpc_timeout:"
 )
-
-var CommandPresets = []string{
-	"pwd",
-	"ls",
-	"ls /data",
-}

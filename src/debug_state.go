@@ -42,9 +42,8 @@ type DebugState struct {
 
 	CurrentAppRoute string
 
-	TerminalHistory   []TerminalHistoryEntry
-	TerminalFavorites []TerminalFavorite
-	TerminalBuffer    []string
+	TerminalHistory []TerminalHistoryEntry
+	TerminalBuffer  []string
 
 	FileCurrentDir       string
 	FileDirInput         string
@@ -88,11 +87,6 @@ func readState[T any](fn func(DebugState) T) T {
 }
 
 func initDebugState() {
-	favorites := make([]TerminalFavorite, 0, len(CommandPresets))
-	for _, cmd := range CommandPresets {
-		favorites = append(favorites, TerminalFavorite{Name: cmd, Command: cmd})
-	}
-
 	withState(func(state *DebugState) {
 		*state = DebugState{
 			CurrentCommand:     DefaultCommand,
@@ -100,7 +94,6 @@ func initDebugState() {
 			LastResponseStatus: "idle",
 			CurrentAppRoute:    RouteDashboard,
 			TerminalHistory:    make([]TerminalHistoryEntry, 0, 32),
-			TerminalFavorites:  favorites,
 			TerminalBuffer:     make([]string, 0, 100),
 			FileCurrentDir:     DefaultFileDir,
 			FileDirInput:       DefaultFileDir,
@@ -120,7 +113,6 @@ func readStateSnapshot() DebugState {
 		copyState := state
 		copyState.ConnectedDevices = append([]device.DeviceInfo(nil), state.ConnectedDevices...)
 		copyState.TerminalHistory = append([]TerminalHistoryEntry(nil), state.TerminalHistory...)
-		copyState.TerminalFavorites = append([]TerminalFavorite(nil), state.TerminalFavorites...)
 		copyState.TerminalBuffer = append([]string(nil), state.TerminalBuffer...)
 		copyState.FileEntries = append([]FileEntry(nil), state.FileEntries...)
 		copyState.FileSelectedPaths = append([]string(nil), state.FileSelectedPaths...)
@@ -178,34 +170,5 @@ func addTerminalHistory(command string, output string, exitCode string) {
 			copy(state.TerminalHistory, state.TerminalHistory[overflow:])
 			state.TerminalHistory = state.TerminalHistory[:MaxTerminalHistory]
 		}
-	})
-}
-
-func addTerminalFavorite(command string) {
-	command = normalizeInline(command)
-	if command == "" {
-		return
-	}
-	withState(func(state *DebugState) {
-		for _, it := range state.TerminalFavorites {
-			if it.Command == command {
-				return
-			}
-		}
-		state.TerminalFavorites = append(state.TerminalFavorites, TerminalFavorite{Name: command, Command: command})
-		if len(state.TerminalFavorites) > MaxTerminalFavorites {
-			overflow := len(state.TerminalFavorites) - MaxTerminalFavorites
-			copy(state.TerminalFavorites, state.TerminalFavorites[overflow:])
-			state.TerminalFavorites = state.TerminalFavorites[:MaxTerminalFavorites]
-		}
-	})
-}
-
-func removeTerminalFavorite(index int) {
-	withState(func(state *DebugState) {
-		if index < 0 || index >= len(state.TerminalFavorites) {
-			return
-		}
-		state.TerminalFavorites = append(state.TerminalFavorites[:index], state.TerminalFavorites[index+1:]...)
 	})
 }

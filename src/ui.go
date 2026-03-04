@@ -9,8 +9,9 @@ import (
 )
 
 var (
-	uiRootMu        sync.Mutex
-	uiRootElementID string
+	uiRootMu            sync.Mutex
+	uiRootElementID     string
+	uiLastRenderedRoute string
 )
 
 func RenderMainUI(elementID string) {
@@ -39,8 +40,14 @@ func buildMainUI(snapshot DebugState) *ui.Element {
 		Padding(12).
 		Gap(10)
 
+	animateRoute := shouldAnimateRoute(snapshot.CurrentAppRoute)
+
 	if snapshot.CurrentAppRoute == RouteDashboard {
-		main = main.Child(applyPageMotion(RouteDashboard, buildHomeDashboard(snapshot)))
+		dashboard := buildHomeDashboard(snapshot)
+		if animateRoute {
+			dashboard = applyPageMotion(RouteDashboard, dashboard)
+		}
+		main = main.Child(dashboard)
 		return main
 	}
 
@@ -59,13 +66,31 @@ func buildMainUI(snapshot DebugState) *ui.Element {
 	default:
 		routeBody = buildHomeDashboard(snapshot)
 	}
-	main = main.Child(applyPageMotion(snapshot.CurrentAppRoute, routeBody))
+	if animateRoute {
+		main = main.Child(applyPageMotion(snapshot.CurrentAppRoute, routeBody))
+	} else {
+		main = main.Child(routeBody)
+	}
 
 	if snapshot.CurrentAppRoute != RouteLogs {
-		main = main.Child(applySectionMotion(buildResultPanel(snapshot), sectionAnimationDelayMs))
+		resultPanel := buildResultPanel(snapshot)
+		if animateRoute {
+			resultPanel = applySectionMotion(resultPanel, sectionAnimationDelayMs)
+		}
+		main = main.Child(resultPanel)
 	}
 
 	return main
+}
+
+func shouldAnimateRoute(currentRoute string) bool {
+	uiRootMu.Lock()
+	defer uiRootMu.Unlock()
+	if uiLastRenderedRoute != currentRoute {
+		uiLastRenderedRoute = currentRoute
+		return true
+	}
+	return false
 }
 
 func buildPageHeader(snapshot DebugState) *ui.Element {
@@ -108,7 +133,7 @@ func buildHomeDashboard(snapshot DebugState) *ui.Element {
 	header := makePanel().
 		Bg("#10172A").
 		Padding(14).
-		Child(makeTitle("VelaSU 控制台").Size(26)).
+		Child(makeTitle("VelaSU 控制台").Size(26).MarginRight(4)).
 		Child(makeMutedText("Interconnect 远程终端与文件管理").MarginTop(4))
 
 	statusText := "未连接设备"
@@ -158,26 +183,32 @@ func buildHomeDashboard(snapshot DebugState) *ui.Element {
 func buildResultPanel(snapshot DebugState) *ui.Element {
 	panel := makePanel().
 		WidthFull().
+		MinWidth(0).
+		Flex().
+		FlexDirection(ui.FlexDirectionColumn).
+		Gap(6).
 		Bg("#0F1424").
 		Padding(12).
-		Child(makeSectionTitle("请求结果")).
-		Child(makeText(fmt.Sprintf("请求: id=%s method=%s", fallback(snapshot.LastRequestID, "-"), fallback(snapshot.LastRequestMethod, "-"))).MarginTop(8)).
-		Child(makeText("状态: " + fallback(snapshot.LastResponseStatus, "idle")).MarginTop(4)).
-		Child(makeText(fmt.Sprintf("耗时: %d ms", snapshot.LastLatencyMs)).MarginTop(4)).
+		Child(makeSectionTitle("请求结果").MarginRight(4)).
+		Child(makeText(fmt.Sprintf("请求: id=%s method=%s", fallback(snapshot.LastRequestID, "-"), fallback(snapshot.LastRequestMethod, "-"))).MarginTop(8).MarginRight(4)).
+		Child(makeText("状态: " + fallback(snapshot.LastResponseStatus, "idle")).MarginTop(4).MarginRight(4)).
+		Child(makeText(fmt.Sprintf("耗时: %d ms", snapshot.LastLatencyMs)).MarginTop(4).MarginRight(4)).
 		Child(makeText("错误: " + fallback(snapshot.LastError, "(none)")).MarginTop(4))
 
 	scroll := el(ui.ElementTypeScrollArea, "").
 		WidthFull().
+		MinWidth(0).
 		MaxHeight(280).
 		PaddingTop(8)
 
 	content := makeColumn().
 		WidthFull().
+		MinWidth(0).
 		Gap(8).
 		Child(makeMutedText("原始响应")).
-		Child(makeCodeBlock(clipPanelText(snapshot.LastResponseRaw, 1800))).
+		Child(makeCodeBlock(clipPanelText(snapshot.LastResponseRaw, 1800)).MinWidth(0)).
 		Child(makeMutedText("格式化响应")).
-		Child(makeCodeBlock(clipPanelText(snapshot.LastResponsePretty, 1800)))
+		Child(makeCodeBlock(clipPanelText(snapshot.LastResponsePretty, 1800)).MinWidth(0))
 
 	scroll = scroll.Child(content)
 	panel = panel.Child(scroll)

@@ -12,7 +12,7 @@ func buildLogsOnlyRoot(snapshot DebugState) *ui.Element {
 	header := makePanel().
 		Bg("#10172A").
 		Padding(12).
-		Child(makeSectionTitle("系统日志")).
+		Child(makeSectionTitle("系统日志").MarginRight(4)).
 		Child(makeMutedText(fmt.Sprintf("日志容量: %d / %d", len(snapshot.Logs), MaxLogEntries)).MarginTop(6)).
 		Child(makeRow().Gap(8).MarginTop(8).
 			Child(makeSecondaryButton("导出全部", EventLogExportText).FlexGrow(1)).

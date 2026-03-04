@@ -43,14 +43,6 @@ func historyRunEventID(index int) string {
 	return fmt.Sprintf("%s%d", EventTerminalHistoryRunPrefix, index)
 }
 
-func favoriteRunEventID(index int) string {
-	return fmt.Sprintf("%s%d", EventTerminalFavoriteRunPrefix, index)
-}
-
-func favoriteDelEventID(index int) string {
-	return fmt.Sprintf("%s%d", EventTerminalFavoriteDelPrefix, index)
-}
-
 func fileOpenEventID(path string) string {
 	return EventFileEntryOpenPrefix + path
 }

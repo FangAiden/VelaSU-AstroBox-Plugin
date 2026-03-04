@@ -75,7 +75,9 @@ func makePrimaryButton(label string, eventID string) *ui.Element {
 		el(ui.ElementTypeButton, label).
 			Bg("#4A6CF7").
 			TextColor("#FFFFFF").
+			Border(1, "#5B7AF8").
 			Radius(8).
+			MinHeight(36).
 			Padding(8).
 			On(ui.EventClick, eventID),
 	)
@@ -86,7 +88,9 @@ func makeDangerButton(label string, eventID string) *ui.Element {
 		el(ui.ElementTypeButton, label).
 			Bg("#B63A4B").
 			TextColor("#FFFFFF").
+			Border(1, "#C44D5E").
 			Radius(8).
+			MinHeight(36).
 			Padding(8).
 			On(ui.EventClick, eventID),
 	)
@@ -99,6 +103,7 @@ func makeSecondaryButton(label string, eventID string) *ui.Element {
 			TextColor("#D4DAEE").
 			Border(1, "#394360").
 			Radius(8).
+			MinHeight(36).
 			Padding(8).
 			On(ui.EventClick, eventID),
 	)

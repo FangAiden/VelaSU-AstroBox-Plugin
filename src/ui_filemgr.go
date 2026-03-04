@@ -34,23 +34,36 @@ func buildFileManagerPanel(snapshot DebugState) *ui.Element {
 func buildFileHeader(snapshot DebugState) *ui.Element {
 	header := makePanel().Bg("#10172A").Padding(10)
 
-	navRow := makeRow().AlignCenter().Gap(8).
-		Child(makeSecondaryButton("上级", EventFileParent)).
-		Child(makeSecondaryButton("刷新", EventFileRefresh)).
-		Child(makeSingleLineInput(snapshot.FileDirInput, EventFileDirInput).FlexGrow(1)).
-		Child(makePrimaryButton("前往", EventFileGoDir))
+	pathRow := makeRow().
+		AlignCenter().
+		Gap(8).
+		Child(makeSingleLineInput(snapshot.FileDirInput, EventFileDirInput).FlexGrow(1).MinWidth(0)).
+		Child(makePrimaryButton("前往", EventFileGoDir).MinWidth(72))
 
-	searchRow := makeRow().AlignCenter().Gap(8).MarginTop(8)
+	navRow := el(ui.ElementTypeGrid, "").
+		WidthFull().
+		GridTemplateColumns("repeat(2, minmax(0, 1fr))").
+		Gap(8).
+		MarginTop(8).
+		Child(makeSecondaryButton("上级", EventFileParent).WidthFull()).
+		Child(makeSecondaryButton("刷新", EventFileRefresh).WidthFull())
+
 	searchBox := makeRow().
+		WidthFull().
 		AlignCenter().
 		Gap(6).
-		FlexGrow(1).
+		MarginTop(8).
 		Bg("#0E1424").
 		Border(1, "#2F3853").
 		Radius(8).
 		Padding(6).
 		Child(makeSVGIcon(IconSVGSearch)).
-		Child(makeSingleLineInput(snapshot.FileSearchQuery, EventFileSearchInput).Bg("transparent").Border(0, "transparent").Padding(0).FlexGrow(1))
+		Child(makeSingleLineInput(snapshot.FileSearchQuery, EventFileSearchInput).
+			Bg("transparent").
+			Border(0, "transparent").
+			Padding(0).
+			FlexGrow(1).
+			MinWidth(0))
 
 	viewRow := makeRow().Gap(4).
 		Child(makeViewSwitchBtn(IconSVGGrid, EventFileViewGrid, snapshot.FileViewMode == FileViewGrid)).
@@ -64,6 +77,7 @@ func buildFileHeader(snapshot DebugState) *ui.Element {
 				TextColor("#D4DAEE").
 				Border(1, "#394360").
 				Radius(8).
+				MinHeight(36).
 				Padding(8).
 				Child(makeSVGIcon(IconSVGSort).MarginLeft(4)),
 		)
@@ -74,31 +88,49 @@ func buildFileHeader(snapshot DebugState) *ui.Element {
 		Child(el(ui.ElementTypeDropdownMenuItem, "按日期排序").On(ui.EventClick, EventFileSortDate))
 	sortMenu = sortMenu.Child(sortTrigger).Child(sortContent)
 
-	quickActions := makeRow().Gap(6).
-		Child(makeActionButton("新建文件", EventFileNewFile)).
-		Child(makeActionButton("新建目录", EventFileNewDir)).
-		Child(makeActionButton("上传", EventFileUpload))
-
-	searchRow = searchRow.
-		Child(searchBox).
+	controlRow := makeRow().
+		AlignCenter().
+		Gap(8).
+		MarginTop(8).
 		Child(viewRow).
-		Child(sortMenu).
+		Child(sortMenu)
+
+	quickActions := el(ui.ElementTypeGrid, "").
+		WidthFull().
+		GridTemplateColumns("repeat(auto-fit, minmax(96px, 1fr))").
+		Gap(6).
+		MarginTop(8).
+		Child(makeActionButton("新建文件", EventFileNewFile).WidthFull()).
+		Child(makeActionButton("新建目录", EventFileNewDir).WidthFull()).
+		Child(makeActionButton("上传", EventFileUpload).WidthFull())
+
+	header = header.
+		Child(pathRow).
+		Child(navRow).
+		Child(searchBox).
+		Child(controlRow).
 		Child(quickActions)
 
 	if len(snapshot.FileSelectedPaths) > 0 {
-		selectedBar := makeRow().Gap(6).MarginTop(8)
-		selectedBar = selectedBar.
+		selectedActions := el(ui.ElementTypeGrid, "").
+			WidthFull().
+			GridTemplateColumns("repeat(auto-fit, minmax(86px, 1fr))").
+			Gap(6).
+			Child(makeActionButton("复制", EventFileCopy).WidthFull()).
+			Child(makeActionButton("移动", EventFileMove).WidthFull()).
+			Child(makeActionButton("重命名", EventFileRename).WidthFull()).
+			Child(makeActionButton("下载", EventFileDownload).WidthFull()).
+			Child(makeDangerActionButton("删除", EventFileDelete).WidthFull())
+
+		selectedBar := makeColumn().
+			Gap(6).
+			MarginTop(8).
 			Child(makeBadge(fmt.Sprintf("已选中 %d 项", len(snapshot.FileSelectedPaths)))).
-			Child(makeActionButton("复制", EventFileCopy)).
-			Child(makeActionButton("移动", EventFileMove)).
-			Child(makeActionButton("重命名", EventFileRename)).
-			Child(makeActionButton("下载", EventFileDownload)).
-			Child(makeDangerActionButton("删除", EventFileDelete))
-		header = header.Child(navRow).Child(searchRow).Child(selectedBar)
-		return header
+			Child(selectedActions)
+
+		header = header.Child(selectedBar)
 	}
 
-	header = header.Child(navRow).Child(searchRow)
 	return header
 }
 
@@ -106,6 +138,8 @@ func makeViewSwitchBtn(iconSVG string, eventID string, active bool) *ui.Element 
 	btn := el(ui.ElementTypeButton, "").
 		Padding(6).
 		Radius(8).
+		MinWidth(42).
+		MinHeight(36).
 		Child(makeSVGIcon(iconSVG))
 	if active {
 		btn = btn.Bg("#3A4D8F").Border(1, "#5F77C6").TextColor("#F2F6FF")
@@ -167,19 +201,11 @@ func buildFileGridItem(snapshot DebugState, it FileEntry) *ui.Element {
 
 func buildFileListView(snapshot DebugState, entries []FileEntry) *ui.Element {
 	container := makePanel().Bg("#0E1424").Padding(8)
-	header := makeRow().
-		AlignCenter().
-		Padding(8).
-		Bg("#1A2238").
-		Radius(8).
-		Child(makeText("名称").FlexGrow(1).TextColor("#AEB9D8")).
-		Child(makeText("大小").Width(80).TextColor("#AEB9D8")).
-		Child(makeText("类型").Width(60).TextColor("#AEB9D8"))
-	container = container.Child(header)
 	if len(entries) == 0 {
 		return container.Child(makeMutedText("当前目录为空").Padding(8))
 	}
-	list := makeColumn().Gap(6).MarginTop(8)
+
+	list := makeColumn().Gap(6)
 	for _, it := range entries {
 		list = list.Child(buildFileListItem(snapshot, it))
 	}
@@ -210,11 +236,13 @@ func buildFileListItem(snapshot DebugState, it FileEntry) *ui.Element {
 		typeText = "目录"
 	}
 
-	row = row.
-		Child(icon).
-		Child(makeText(it.Name).FlexGrow(1)).
-		Child(makeMutedText(fileMetaText(it)).Width(80)).
-		Child(makeMutedText(typeText).Width(60))
+	content := makeColumn().
+		FlexGrow(1).
+		MinWidth(0).
+		Child(makeText(it.Name).TextColor("#E8EEFF")).
+		Child(makeMutedText(typeText + " · " + fileMetaText(it)).MarginTop(2))
+
+	row = row.Child(icon).Child(content)
 
 	trigger = trigger.Child(row)
 	ctxRoot = ctxRoot.Child(trigger).Child(buildFileContextMenu(it))
@@ -246,20 +274,30 @@ func buildFileStatusBar(snapshot DebugState, filteredCount int, visibleCount int
 	case FileSortBySize:
 		sortText = "大小"
 	case FileSortByDate:
-		sortText = "日期（降级为名称）"
+		sortText = "日期(降级为名称)"
 	}
-	bar := makeRow().
-		AlignCenter().
-		Gap(8).
+
+	bar := makeColumn().
+		Gap(6).
 		Padding(8).
 		Bg("#11192E").
 		Border(1, "#27324A").
-		Radius(10).
+		Radius(10)
+
+	summary := makeRow().
+		AlignCenter().
+		Gap(8).
 		Child(makeSVGIcon(IconSVGHardDrive)).
-		Child(makeMutedText(fmt.Sprintf("显示 %d / %d", visibleCount, filteredCount))).
+		Child(makeMutedText(fmt.Sprintf("显示 %d / %d", visibleCount, filteredCount)))
+
+	meta := el(ui.ElementTypeGrid, "").
+		WidthFull().
+		GridTemplateColumns("repeat(auto-fit, minmax(120px, 1fr))").
+		Gap(6).
 		Child(makeBadge("视图: " + modeText)).
-		Child(makeBadge("排序: " + sortText)).
-		Child(makeSpacer())
+		Child(makeBadge("排序: " + sortText))
+
+	bar = bar.Child(summary).Child(meta)
 	if snapshot.TransferProgress != "" && snapshot.TransferProgress != "idle" {
 		bar = bar.Child(makeText("进度: " + snapshot.TransferProgress).TextColor("#87E9C6"))
 	}
@@ -281,7 +319,7 @@ func buildFilePreviewPanel(snapshot DebugState) *ui.Element {
 
 	if snapshot.FileEditorIsBinary {
 		preview = preview.
-			Child(makeMutedText("二进制预览（hex）").MarginTop(8)).
+			Child(makeMutedText("二进制预览(hex)").MarginTop(8)).
 			Child(makeCodeBlock(fallback(snapshot.FileEditorHexPreview, "(empty)")).MarginTop(6))
 	} else {
 		preview = preview.

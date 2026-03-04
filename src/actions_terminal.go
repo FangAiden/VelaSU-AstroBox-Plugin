@@ -93,6 +93,7 @@ func actionExecCommand() {
 			lastPage = 0
 		}
 		state.TerminalPage = lastPage
+		state.CurrentCommand = ""
 	})
 	EnqueueRpcTask("terminal.exec", func() error {
 		return RpcShellExec(cmd, DefaultShellTimeoutMs, func(result ShellExecResult, err error) {
@@ -115,18 +116,6 @@ func actionTerminalClear() {
 	appendLog("INFO", "终端输出已清空")
 }
 
-func actionTerminalAddFavorite() {
-	cmd := readState(func(state DebugState) string {
-		return strings.TrimSpace(state.CurrentCommand)
-	})
-	if cmd == "" {
-		appendLog("WARN", "空命令不能收藏")
-		return
-	}
-	addTerminalFavorite(cmd)
-	appendLogf("INFO", "已添加收藏命令: %s", cmd)
-}
-
 func actionTerminalRunHistory(index int) {
 	if index < 0 {
 		return
@@ -140,29 +129,6 @@ func actionTerminalRunHistory(index int) {
 		state.CurrentCommand = cmd
 	})
 	actionExecCommand()
-}
-
-func actionTerminalRunFavorite(index int) {
-	if index < 0 {
-		return
-	}
-	snapshot := readStateSnapshot()
-	if index >= len(snapshot.TerminalFavorites) {
-		return
-	}
-	cmd := snapshot.TerminalFavorites[index].Command
-	withState(func(state *DebugState) {
-		state.CurrentCommand = cmd
-	})
-	actionExecCommand()
-}
-
-func actionTerminalDeleteFavorite(index int) {
-	if index < 0 {
-		return
-	}
-	removeTerminalFavorite(index)
-	appendLog("INFO", "已删除收藏命令")
 }
 
 func actionTerminalExportText() {

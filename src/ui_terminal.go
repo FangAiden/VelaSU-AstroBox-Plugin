@@ -7,6 +7,8 @@ import (
 	ui "astroboxplugin/bindings/astrobox_psys_host_ui_v3"
 )
 
+const terminalScrollBottom uint32 = 1000000
+
 func terminalOutputText(lines []string) string {
 	text := strings.Join(lines, "\n")
 	if strings.TrimSpace(text) == "" {
@@ -53,22 +55,6 @@ func buildTerminalPanel(snapshot DebugState) *ui.Element {
 				Child(makeDangerButton("清空", EventTerminalClear)),
 		)
 
-	favRow := makeRow().AlignCenter().Gap(6).MarginTop(8)
-	if len(snapshot.TerminalFavorites) == 0 {
-		favRow = favRow.Child(makeMutedText("暂无收藏命令"))
-	} else {
-		for i, fav := range snapshot.TerminalFavorites {
-			if i >= 8 {
-				break
-			}
-			favRow = favRow.Child(makeActionButton(fav.Name, favoriteRunEventID(i)))
-		}
-		if len(snapshot.TerminalFavorites) > 8 {
-			favRow = favRow.Child(makeBadge(fmt.Sprintf("+%d", len(snapshot.TerminalFavorites)-8)))
-		}
-	}
-	header = header.Child(favRow)
-
 	screen := makePanel().
 		Bg("#050A12").
 		Border(1, "#1F2A3F").
@@ -77,7 +63,9 @@ func buildTerminalPanel(snapshot DebugState) *ui.Element {
 	scroll := el(ui.ElementTypeScrollArea, "").
 		WidthFull().
 		Height(320).
-		Padding(4)
+		Padding(4).
+		ScrollBehavior("smooth").
+		ScrollTop(terminalScrollBottom)
 
 	outputText := terminalOutputText(allLines)
 	output := el(ui.ElementTypeCode, outputText).
@@ -104,13 +92,12 @@ func buildTerminalPanel(snapshot DebugState) *ui.Element {
 		AlignCenter().
 		Gap(8).
 		Child(cmdInput).
-		Child(makeSecondaryButton("收藏", EventTerminalAddFavorite)).
 		Child(makePrimaryButton("执行", EventExecCommand))
 
 	historyPanel := makePanel().
 		Bg("#0E1423").
 		Padding(10).
-		Child(makeSectionTitle("最近命令"))
+		Child(makeSectionTitle("最近命令").MarginRight(4))
 	if len(snapshot.TerminalHistory) == 0 {
 		historyPanel = historyPanel.Child(makeMutedText("暂无历史记录").MarginTop(8))
 	} else {
