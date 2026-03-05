@@ -50,9 +50,15 @@ func buildTerminalPanel(snapshot DebugState) *ui.Element {
 				Child(makeSVGIcon(IconSVGTerminal)).
 				Child(makeSectionTitle("终端")).
 				Child(makeBadge(fmt.Sprintf("%d 行", len(allLines)))).
-				Child(makeSpacer()).
-				Child(makeSecondaryButton("导出", EventTerminalExportText)).
-				Child(makeDangerButton("清空", EventTerminalClear)),
+				Child(makeSpacer()),
+		).
+		Child(
+			el(ui.ElementTypeGrid, "").
+				WidthFull().
+				GridTemplateColumns("repeat(auto-fit, minmax(120px, 1fr))").
+				Gap(8).
+				MarginTop(8).
+				Child(makeDangerButton("清空", EventTerminalClear).WidthFull().MinWidth(0)),
 		)
 
 	screen := makePanel().
@@ -91,10 +97,11 @@ func buildTerminalPanel(snapshot DebugState) *ui.Element {
 		On(ui.EventKeyDown, EventTerminalKeyDown)
 
 	inputRow := makeRow().
+		WidthFull().
 		AlignCenter().
 		Gap(8).
-		Child(cmdInput).
-		Child(makePrimaryButton("执行", EventExecCommand))
+		Child(cmdInput.WidthFull().MinWidth(0).FlexGrow(1)).
+		Child(makePrimaryButton("执行", EventExecCommand).MinWidth(92))
 
 	historyPanel := makePanel().
 		Bg("#0E1423").
@@ -109,13 +116,20 @@ func buildTerminalPanel(snapshot DebugState) *ui.Element {
 		}
 		for idx := len(snapshot.TerminalHistory) - 1; idx >= startIdx; idx-- {
 			item := snapshot.TerminalHistory[idx]
-			row := makeRow().
-				AlignCenter().
-				Gap(8).
+			row := makePanel().
+				Bg("#11182A").
+				Border(1, "#27324A").
+				Padding(8).
 				MarginTop(8).
-				Child(makeMutedText(item.Timestamp + "  " + item.ExitCode).Width(100)).
-				Child(el(ui.ElementTypeCode, item.Command).TextColor("#D8E4FF").FlexGrow(1)).
-				Child(makeActionButton("重跑", historyRunEventID(idx)))
+				Child(
+					makeRow().
+						WidthFull().
+						AlignCenter().
+						Gap(8).
+						Child(makeMutedText(item.Timestamp + "  " + item.ExitCode).MinWidth(0).FlexGrow(1)).
+						Child(makeActionButton("重跑", historyRunEventID(idx))),
+				).
+				Child(el(ui.ElementTypeCode, item.Command).TextColor("#D8E4FF").MarginTop(6).WidthFull().MinWidth(0))
 			historyPanel = historyPanel.Child(row)
 		}
 	}

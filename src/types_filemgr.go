@@ -26,8 +26,9 @@ type FileEntry struct {
 }
 
 type ClipboardState struct {
-	SourcePath string
-	Mode       string // copy | move
+	SourcePath  string
+	SourceIsDir bool
+	Mode        string // copy | move
 }
 
 type EditorState struct {

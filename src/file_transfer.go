@@ -1,11 +1,8 @@
 package plugin
 
 import (
-	"bytes"
 	"encoding/base64"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"unicode/utf8"
 )
@@ -87,8 +84,11 @@ func DownloadRemoteFileToLocal(remotePath string) (string, error) {
 	}
 
 	base := BaseName(remotePath)
-	localPath := filepath.Join(LocalDownloadDir, base)
-	var buffer bytes.Buffer
+	sessionID, saveName, err := startLocalSaveSession(base)
+	if err != nil {
+		return "", err
+	}
+	downloadedBytes := 0
 
 	var enqueueRead func(offset int)
 	enqueueRead = func(offset int) {
@@ -100,6 +100,7 @@ func DownloadRemoteFileToLocal(remotePath string) (string, error) {
 					withState(func(state *DebugState) {
 						state.TransferProgress = "download failed"
 					})
+					abortLocalSaveSession(sessionID)
 					return
 				}
 				data, err := base64.StdEncoding.DecodeString(result.Data)
@@ -108,26 +109,35 @@ func DownloadRemoteFileToLocal(remotePath string) (string, error) {
 					withState(func(state *DebugState) {
 						state.TransferProgress = "download decode failed"
 					})
+					abortLocalSaveSession(sessionID)
 					return
 				}
-				_, _ = buffer.Write(data)
+				if err := writeLocalSaveChunk(sessionID, data); err != nil {
+					appendLogf("ERROR", "写入本地分块失败: %v", err)
+					withState(func(state *DebugState) {
+						state.TransferProgress = "download write failed"
+					})
+					abortLocalSaveSession(sessionID)
+					return
+				}
+				downloadedBytes += len(data)
 				withState(func(state *DebugState) {
-					state.TransferProgress = fmt.Sprintf("download %d bytes", buffer.Len())
+					state.TransferProgress = fmt.Sprintf("download %d bytes", downloadedBytes)
 				})
 				if result.Eof {
-					if err := os.MkdirAll(LocalDownloadDir, 0o755); err != nil {
-						appendLogf("ERROR", "创建下载目录失败: %v", err)
-						return
-					}
-					if err := os.WriteFile(localPath, buffer.Bytes(), 0o644); err != nil {
-						appendLogf("ERROR", "写入本地文件失败: %v", err)
+					if err := finishLocalSaveSession(sessionID); err != nil {
+						appendLogf("ERROR", "完成本地保存失败: %v", err)
+						withState(func(state *DebugState) {
+							state.TransferProgress = "download finish failed"
+						})
+						abortLocalSaveSession(sessionID)
 						return
 					}
 					withState(func(state *DebugState) {
-						state.TransferLastLocalPath = localPath
-						state.TransferProgress = fmt.Sprintf("download done (%d bytes)", buffer.Len())
+						state.TransferLastLocalPath = saveName
+						state.TransferProgress = fmt.Sprintf("download done (%d bytes)", downloadedBytes)
 					})
-					appendLogf("INFO", "下载完成: %s", localPath)
+					appendLogf("INFO", "下载完成: %s", saveName)
 					return
 				}
 				enqueueRead(result.NextOffset)
@@ -136,57 +146,64 @@ func DownloadRemoteFileToLocal(remotePath string) (string, error) {
 	}
 
 	enqueueRead(0)
-	return localPath, nil
+	return saveName, nil
 }
 
 func LoadRemoteFilePreview(remotePath string) error {
 	remotePath = NormalizePath(readState(func(state DebugState) string { return state.FileCurrentDir }), remotePath)
 	if remotePath == "" || remotePath == "/" {
-		return fmt.Errorf("打开文件路径无效")
+		return fmt.Errorf("invalid remote file path")
 	}
 
-	var buffer bytes.Buffer
-	truncated := false
-
-	var enqueueRead func(offset int)
-	enqueueRead = func(offset int) {
-		offsetCopy := offset
-		EnqueueRpcTask(fmt.Sprintf("preview offset %d", offsetCopy), func() error {
-			return RpcFsReadChunk(remotePath, offsetCopy, DefaultFsChunkSize, func(result FsReadResult, err error) {
-				if err != nil {
-					appendLogf("ERROR", "读取文件失败: %v", err)
-					return
-				}
-				data, err := base64.StdEncoding.DecodeString(result.Data)
-				if err != nil {
-					appendLogf("ERROR", "文件解码失败: %v", err)
-					return
-				}
-
-				remain := MaxEditorPreviewSize - buffer.Len()
-				if remain <= 0 {
-					truncated = true
-				} else if len(data) > remain {
-					_, _ = buffer.Write(data[:remain])
-					truncated = true
-				} else {
-					_, _ = buffer.Write(data)
-				}
-
-				if result.Eof || truncated {
-					applyEditorBytes(remotePath, buffer.Bytes(), truncated)
-					return
-				}
-				enqueueRead(result.NextOffset)
-			})
-		})
-	}
-
+	var previewSeq uint64
 	withState(func(state *DebugState) {
+		state.FilePreviewSeq++
+		previewSeq = state.FilePreviewSeq
 		state.FileSelectedPaths = []string{remotePath}
 		state.TransferProgress = "preview reading"
 	})
-	enqueueRead(0)
+
+	isPreviewActive := func() bool {
+		return readState(func(state DebugState) bool {
+			return state.FilePreviewSeq == previewSeq &&
+				len(state.FileSelectedPaths) == 1 &&
+				state.FileSelectedPaths[0] == remotePath
+		})
+	}
+
+	EnqueueRpcTask("preview chunk 0", func() error {
+		if !isPreviewActive() {
+			return nil
+		}
+		return RpcFsReadChunk(remotePath, 0, DefaultFsChunkSize, func(result FsReadResult, err error) {
+			if !isPreviewActive() {
+				return
+			}
+			if err != nil {
+				appendLogf("ERROR", "preview read failed: %v", err)
+				withState(func(state *DebugState) {
+					state.TransferProgress = "preview failed"
+				})
+				return
+			}
+
+			data, err := base64.StdEncoding.DecodeString(result.Data)
+			if err != nil {
+				appendLogf("ERROR", "preview decode failed: %v", err)
+				withState(func(state *DebugState) {
+					state.TransferProgress = "preview decode failed"
+				})
+				return
+			}
+
+			truncated := !result.Eof
+			if len(data) > MaxEditorPreviewSize {
+				data = data[:MaxEditorPreviewSize]
+				truncated = true
+			}
+			applyEditorBytes(remotePath, data, truncated)
+		})
+	})
 	return nil
 }
 

@@ -25,6 +25,12 @@ type DebugState struct {
 	SelectedDeviceAddr   string
 	SelectedDeviceName   string
 	RegisteredDeviceAddr string
+	DependencyChecked    bool
+	DependencyMessage    string
+	TargetWatchfaceID    string
+	TargetWatchfaceFound bool
+	TargetWatchfaceOn    bool
+	TargetQuickAppFound  bool
 
 	TokenInput      string
 	CurrentCommand  string
@@ -48,8 +54,12 @@ type DebugState struct {
 	FileCurrentDir       string
 	FileDirInput         string
 	FileSearchQuery      string
+	FileRenameInput      string
 	FileViewMode         FileViewMode
 	FileSortMode         FileSortMode
+	FileSortAsc          bool
+	FileClipboard        ClipboardState
+	FilePreviewSeq       uint64
 	FileEntries          []FileEntry
 	FileVisibleCount     int
 	FileSelectedPaths    []string // Supports multi-select
@@ -93,12 +103,14 @@ func initDebugState() {
 			CurrentCwdInput:    DefaultFileDir,
 			LastResponseStatus: "idle",
 			CurrentAppRoute:    RouteDashboard,
+			DependencyMessage:  "未检查依赖状态",
 			TerminalHistory:    make([]TerminalHistoryEntry, 0, 32),
 			TerminalBuffer:     make([]string, 0, 100),
 			FileCurrentDir:     DefaultFileDir,
 			FileDirInput:       DefaultFileDir,
 			FileViewMode:       FileViewGrid,
 			FileSortMode:       FileSortByName,
+			FileSortAsc:        true,
 			FileEntries:        make([]FileEntry, 0, 64),
 			FileVisibleCount:   DefaultDirPageSize,
 			TransferProgress:   "idle",

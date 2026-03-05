@@ -145,9 +145,28 @@ func enqueueShellCommandTask(name string, cmd string, onSuccess func(ShellExecRe
 				appendLogf("ERROR", "%s 执行失败: %v", name, err)
 				return
 			}
+			if execErr := shellExecNonZeroErr(result); execErr != nil {
+				appendLogf("ERROR", "%s 执行失败: cmd=%s %v", name, cmd, execErr)
+				return
+			}
 			if onSuccess != nil {
 				onSuccess(result)
 			}
 		})
 	})
+}
+
+func shellExecNonZeroErr(result ShellExecResult) error {
+	if result.ExitCode == nil || *result.ExitCode == 0 {
+		return nil
+	}
+	output := normalizeInline(result.Output)
+	if output == "" {
+		return fmt.Errorf("exitCode=%d", *result.ExitCode)
+	}
+	const maxOutput = 240
+	if len(output) > maxOutput {
+		output = output[:maxOutput] + "..."
+	}
+	return fmt.Errorf("exitCode=%d output=%s", *result.ExitCode, output)
 }

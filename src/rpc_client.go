@@ -128,22 +128,39 @@ func invokeRequestCallback(id string, resp RpcResponse, err error) {
 	cb(resp, err)
 }
 
-func handleInterconnectEventPayload(eventPayload string) {
+func handleInterconnectEventPayload(eventPayload string) bool {
+	hasPending := readState(func(state DebugState) bool {
+		return state.Pending != nil
+	})
+	if !hasPending {
+		return false
+	}
+
 	text, err := ExtractPayloadText(eventPayload)
 	if err != nil {
 		appendLogf("ERROR", "解析 interconnect 事件失败: %v", err)
-		return
+		return false
 	}
 	text = strings.TrimSpace(text)
 	if text == "" {
 		appendLog("WARN", "收到空 interconnect 消息")
-		return
+		return false
 	}
 
-	withState(func(state *DebugState) {
-		state.LastResponseRaw = text
-		state.LastResponsePretty = prettyJSON(text)
+	pendingMethod := readState(func(state DebugState) string {
+		if state.Pending == nil {
+			return ""
+		}
+		return state.Pending.Method
 	})
+
+	if shouldRecordResponsePreview(pendingMethod) {
+		withState(func(state *DebugState) {
+			rawPreview, prettyPreview := buildResponsePreview(text)
+			state.LastResponseRaw = rawPreview
+			state.LastResponsePretty = prettyPreview
+		})
+	}
 
 	resp, err := ParseRpcResponse(text)
 	if err != nil {
@@ -159,14 +176,49 @@ func handleInterconnectEventPayload(eventPayload string) {
 			state.LastError = "回包不是有效的 RPC JSON"
 		})
 		appendLog("WARN", "无效回包导致 pending 请求终止")
-		DrainTaskQueue()
-		return
+		scheduleQueueDrain()
+		return true
 	}
 
-	handleParsedRpcResponse(resp)
+	return handleParsedRpcResponse(resp)
 }
 
-func handleParsedRpcResponse(resp RpcResponse) {
+func buildResponsePreview(raw string) (string, string) {
+	const maxRawChars = 4096
+	const maxPrettyInputChars = 12288
+	const maxPrettyChars = 4096
+
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", ""
+	}
+
+	rawPreview := raw
+	if len(rawPreview) > maxRawChars {
+		rawPreview = rawPreview[:maxRawChars] + "\n...(truncated)"
+	}
+
+	if len(raw) > maxPrettyInputChars {
+		return rawPreview, "(omitted: payload too large to pretty-print)"
+	}
+
+	pretty := prettyJSON(raw)
+	if len(pretty) > maxPrettyChars {
+		pretty = pretty[:maxPrettyChars] + "\n...(truncated)"
+	}
+	return rawPreview, pretty
+}
+
+func shouldRecordResponsePreview(method string) bool {
+	switch strings.TrimSpace(method) {
+	case "fs.read":
+		return false
+	default:
+		return true
+	}
+}
+
+func handleParsedRpcResponse(resp RpcResponse) bool {
 	snapshot := readStateSnapshot()
 	pending := snapshot.Pending
 	if pending == nil {
@@ -174,14 +226,14 @@ func handleParsedRpcResponse(resp RpcResponse) {
 			state.LastResponseStatus = "unmatched"
 		})
 		appendLogf("WARN", "收到未匹配回包 id=%s", resp.ID)
-		return
+		return false
 	}
 	if resp.ID != pending.ID {
 		withState(func(state *DebugState) {
 			state.LastResponseStatus = "id_mismatch"
 		})
 		appendLogf("WARN", "回包 id 不匹配: pending=%s resp=%s", pending.ID, resp.ID)
-		return
+		return false
 	}
 
 	clearPendingTimer(pending.TimeoutTimerID)
@@ -204,14 +256,25 @@ func handleParsedRpcResponse(resp RpcResponse) {
 	if !resp.OK {
 		appendLogf("ERROR", "RPC 失败: %s", lastErr)
 		invokeRequestCallback(resp.ID, resp, errors.New(lastErr))
-		DrainTaskQueue()
-		return
+		scheduleQueueDrain()
+		return true
 	}
 
 	appendLogf("INFO", "RPC 成功: method=%s latency=%dms", pending.Method, latency)
 	handleSuccessResult(pending.Method, resp.Result)
 	invokeRequestCallback(resp.ID, resp, nil)
-	DrainTaskQueue()
+	scheduleQueueDrain()
+
+	if strings.TrimSpace(pending.Method) == "fs.read" {
+		progress := readState(func(state DebugState) string {
+			return strings.TrimSpace(state.TransferProgress)
+		})
+		if strings.Contains(progress, "done") || strings.Contains(progress, "failed") {
+			return true
+		}
+		return false
+	}
+	return true
 }
 
 func handleSuccessResult(method string, resultRaw json.RawMessage) {
@@ -269,7 +332,7 @@ func handleSuccessResult(method string, resultRaw json.RawMessage) {
 			}
 		})
 		appendLogf("INFO", "%s: cwd=%s", method, result.Cwd)
-	case "fs.stat", "fs.read", "fs.write":
+	case "fs.stat", "fs.write":
 		appendLogf("INFO", "%s 完成", method)
 	}
 }
@@ -293,23 +356,19 @@ func clearPendingRequest(reason string) {
 	if reason != "" {
 		appendLogf("WARN", "取消 pending 请求: %s", reason)
 	}
-	DrainTaskQueue()
+	scheduleQueueDrain()
 }
 
-func handleRpcTimeoutEventPayload(eventPayload string) {
-	text, err := ExtractPayloadText(eventPayload)
-	if err != nil {
-		return
-	}
+func handleRpcTimeoutPayloadText(text string) bool {
 	text = strings.TrimSpace(text)
 	if !strings.HasPrefix(text, timerPayloadPrefix) {
-		return
+		return false
 	}
 
 	timeoutID := strings.TrimPrefix(text, timerPayloadPrefix)
 	snapshot := readStateSnapshot()
 	if snapshot.Pending == nil || snapshot.Pending.ID != timeoutID {
-		return
+		return false
 	}
 
 	invokeRequestCallback(timeoutID, RpcResponse{}, errors.New("rpc timeout"))
@@ -319,7 +378,16 @@ func handleRpcTimeoutEventPayload(eventPayload string) {
 		state.LastError = "请求超时，请重试"
 	})
 	appendLogf("ERROR", "RPC 超时: id=%s", timeoutID)
-	DrainTaskQueue()
+	scheduleQueueDrain()
+	return true
+}
+
+func handleRpcTimeoutEventPayload(eventPayload string) bool {
+	text, err := ExtractPayloadText(eventPayload)
+	if err != nil {
+		return false
+	}
+	return handleRpcTimeoutPayloadText(text)
 }
 
 func rpcErrorMessage(resp RpcResponse) string {

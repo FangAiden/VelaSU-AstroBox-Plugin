@@ -27,6 +27,10 @@ func HandleUIEvent(eventID string, event ui.Event, eventPayload string) {
 		return
 	}
 
+	if requiresDependencyReady(eventID) && !ensureDependencyReadyForUsage() {
+		return
+	}
+
 	switch {
 	// Device & Connection
 	case eventID == EventDeviceRefresh:
@@ -39,6 +43,8 @@ func HandleUIEvent(eventID string, event ui.Event, eventPayload string) {
 		actionHello()
 	case eventID == EventLaunchQA:
 		actionLaunchQA()
+	case eventID == EventDependencyRefresh:
+		actionDependencyRefresh()
 
 	// Routing
 	case eventID == EventRouteDashboard:
@@ -59,8 +65,6 @@ func HandleUIEvent(eventID string, event ui.Event, eventPayload string) {
 		actionTerminalClear()
 	case strings.HasPrefix(eventID, EventTerminalHistoryRunPrefix):
 		actionTerminalRunHistory(parseSuffixIndex(eventID, EventTerminalHistoryRunPrefix))
-	case eventID == EventTerminalExportText:
-		actionTerminalExportText()
 
 	// File Manager
 	case eventID == EventFileRefresh:
@@ -76,19 +80,13 @@ func HandleUIEvent(eventID string, event ui.Event, eventPayload string) {
 	case eventID == EventFileViewList:
 		withState(func(state *DebugState) { state.FileViewMode = FileViewList })
 	case eventID == EventFileSortName:
-		withState(func(state *DebugState) { state.FileSortMode = FileSortByName })
-		actionFileRefresh()
+		actionFileSort(FileSortByName)
 	case eventID == EventFileSortSize:
-		withState(func(state *DebugState) { state.FileSortMode = FileSortBySize })
-		actionFileRefresh()
+		actionFileSort(FileSortBySize)
 	case eventID == EventFileSortDate:
-		withState(func(state *DebugState) { state.FileSortMode = FileSortByDate })
-		appendLog("INFO", "当前协议不提供修改时间，按名称排序作为降级策略")
-		actionFileRefresh()
+		appendLog("INFO", "日期排序已移除")
 	case strings.HasPrefix(eventID, EventFileEntryOpenPrefix):
 		actionFileOpenEntry(strings.TrimPrefix(eventID, EventFileEntryOpenPrefix))
-	case eventID == EventFileNewFile:
-		actionFileNewFile()
 	case eventID == EventFileNewDir:
 		actionFileNewDir()
 	case eventID == EventFileDelete:
@@ -99,12 +97,14 @@ func HandleUIEvent(eventID string, event ui.Event, eventPayload string) {
 		actionFileCopy()
 	case eventID == EventFileMove:
 		actionFileMove()
+	case eventID == EventFilePaste:
+		actionFilePaste()
+	case eventID == EventFileClipboardClear:
+		actionFileClipboardClear()
 	case eventID == EventFileUpload:
 		actionFileUpload()
 	case eventID == EventFileDownload:
 		actionFileDownload()
-	case eventID == EventFileSave:
-		actionFileSave()
 
 	// File Manager Context menu shortcuts
 	case strings.HasPrefix(eventID, EventFileCtxCopyPrefix):
@@ -126,8 +126,6 @@ func HandleUIEvent(eventID string, event ui.Event, eventPayload string) {
 	// Logs
 	case eventID == EventLogClear:
 		actionLogClear()
-	case eventID == EventLogExportText:
-		actionLogExportText()
 
 	// Pagination
 	case eventID == EventLogPagePrev:
@@ -179,9 +177,9 @@ func handleInputChange(eventID string, eventPayload string) {
 		withState(func(state *DebugState) {
 			state.FileSearchQuery = value
 		})
-	case EventFileEditorInput:
+	case EventFileRenameInput:
 		withState(func(state *DebugState) {
-			state.FileEditorText = value
+			state.FileRenameInput = strings.TrimSpace(value)
 		})
 	}
 }
@@ -203,6 +201,8 @@ func selectSinglePath(path string) {
 	}
 	withState(func(state *DebugState) {
 		state.FileSelectedPaths = []string{path}
+		state.FileRenameInput = BaseName(path)
+		state.FilePreviewSeq++
 	})
 }
 
@@ -242,4 +242,33 @@ func parseUIEventPayload(eventPayload string) (uiEventPayload, bool) {
 
 func ResultUnitFailed(ret wit_types.Result[wit_types.Unit, wit_types.Unit]) bool {
 	return ret.IsErr()
+}
+
+func requiresDependencyReady(eventID string) bool {
+	switch {
+	case eventID == EventDeviceRefresh:
+		return false
+	case strings.HasPrefix(eventID, EventDeviceSelectPrefix):
+		return false
+	case eventID == EventDependencyRefresh:
+		return false
+	case eventID == EventLaunchQA:
+		return false
+	case eventID == EventRouteDashboard:
+		return false
+	case eventID == EventRouteSettings:
+		return false
+	case eventID == EventRouteLogs:
+		return false
+	case eventID == EventLogClear:
+		return false
+	case eventID == EventLogExportText:
+		return false
+	case eventID == EventLogPagePrev:
+		return false
+	case eventID == EventLogPageNext:
+		return false
+	default:
+		return true
+	}
 }

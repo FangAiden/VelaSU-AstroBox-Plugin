@@ -12,11 +12,20 @@ import (
 func OnEvent(eventType pluginEvent.EventType, eventPayload string) string {
 	switch eventType {
 	case pluginEvent.EventTypeInterconnectMessage:
-		handleInterconnectEventPayload(eventPayload)
-		RerenderMainUI()
+		if handleInterconnectEventPayload(eventPayload) {
+			RerenderMainUI()
+		}
 	case pluginEvent.EventTypeTimer:
-		handleRpcTimeoutEventPayload(eventPayload)
-		RerenderMainUI()
+		payloadText, err := ExtractPayloadText(eventPayload)
+		if err != nil {
+			break
+		}
+		if handleQueueDrainPayloadText(payloadText) {
+			break
+		}
+		if handleRpcTimeoutPayloadText(payloadText) {
+			RerenderMainUI()
+		}
 	case pluginEvent.EventTypePluginMessage:
 		if !tryHandleUIEventV3Message(eventPayload) {
 			appendLogf("INFO", "plugin-message: %s", truncateText(eventPayload, 160))
@@ -52,8 +61,10 @@ func OnCardRender(cardID string) {
 }
 
 func shouldRerenderAfterUIEvent(event ui.Event, eventID string, eventPayload string) bool {
-	if event == ui.EventInput || event == ui.EventChange {
-		_ = eventID
+	if event == ui.EventInput {
+		return eventID == EventFileSearchInput
+	}
+	if event == ui.EventChange {
 		_ = eventPayload
 		return false
 	}

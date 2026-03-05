@@ -12,7 +12,8 @@
     "interconnect",
     "device",
     "register_interconnect_recv",
-    "thirdpartyapp"
+    "thirdpartyapp",
+    "watchface"
   ],
   "additional_files": []
 }

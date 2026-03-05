@@ -82,7 +82,31 @@ func BaseName(path string) string {
 }
 
 func ShellQuote(s string) string {
-	s = strings.ReplaceAll(s, "'", "'\"'\"'")
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "''"
+	}
+	safe := true
+	for _, ch := range s {
+		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') {
+			continue
+		}
+		switch ch {
+		case '/', '.', '-', '_':
+			continue
+		default:
+			safe = false
+		}
+		if !safe {
+			break
+		}
+	}
+	if safe {
+		return s
+	}
+	// nsh 对双引号转义兼容性差，统一改为单引号包裹。
+	// 对极少出现的单引号字符采用 POSIX 方式转义。
+	s = strings.ReplaceAll(s, "'", "'\\''")
 	return "'" + s + "'"
 }
 

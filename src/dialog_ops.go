@@ -50,7 +50,7 @@ func promptInputDialog(title string, content string, defaultValue string) (strin
 	}
 	ret := dialog.ShowDialog(
 		dialog.DialogTypeInput,
-		dialog.DialogStyleSystem,
+		dialog.DialogStyleWebsite,
 		dialog.DialogInfo{
 			Title:   title,
 			Content: message,
@@ -79,4 +79,47 @@ func pickLocalFile() (string, []byte, error) {
 		return "", nil, fmt.Errorf("未选择文件")
 	}
 	return ret.Name, ret.Data, nil
+}
+
+func startLocalSaveSession(defaultFileName string) (uint64, string, error) {
+	ret := dialog.SaveFileStart(
+		dialog.FilterConfig{
+			Multiple:         false,
+			Extensions:       []string{},
+			DefaultDirectory: "",
+			DefaultFileName:  strings.TrimSpace(defaultFileName),
+		},
+	).Read()
+	if ret.IsErr() {
+		return 0, "", fmt.Errorf("未选择保存位置")
+	}
+	session := ret.Ok()
+	name := strings.TrimSpace(session.Name)
+	if name == "" {
+		name = strings.TrimSpace(defaultFileName)
+	}
+	return session.SessionId, name, nil
+}
+
+func writeLocalSaveChunk(sessionID uint64, data []byte) error {
+	if len(data) == 0 {
+		return nil
+	}
+	ret := dialog.SaveFileWriteChunk(sessionID, data).Read()
+	if ret.IsErr() {
+		return fmt.Errorf("写入本地分块失败")
+	}
+	return nil
+}
+
+func finishLocalSaveSession(sessionID uint64) error {
+	ret := dialog.SaveFileFinish(sessionID).Read()
+	if ret.IsErr() {
+		return fmt.Errorf("完成本地保存失败")
+	}
+	return nil
+}
+
+func abortLocalSaveSession(sessionID uint64) {
+	dialog.SaveFileAbort(sessionID).Read()
 }

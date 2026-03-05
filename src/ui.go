@@ -37,7 +37,7 @@ func RerenderMainUI() {
 func buildMainUI(snapshot DebugState) *ui.Element {
 	main := makeColumn().
 		WidthFull().
-		Padding(12).
+		Padding(10).
 		Gap(10)
 
 	animateRoute := shouldAnimateRoute(snapshot.CurrentAppRoute)
@@ -129,12 +129,13 @@ func buildPageHeader(snapshot DebugState) *ui.Element {
 
 func buildHomeDashboard(snapshot DebugState) *ui.Element {
 	root := makeColumn().WidthFull().Gap(16)
+	ready := dependencyReady(snapshot)
 
 	header := makePanel().
 		Bg("#10172A").
 		Padding(14).
 		Child(makeTitle("VelaSU 控制台").Size(26).MarginRight(4)).
-		Child(makeMutedText("Interconnect 远程终端与文件管理").MarginTop(4))
+		Child(makeMutedText("终端与文件管理").MarginTop(4))
 
 	statusText := "未连接设备"
 	statusColor := "#93A0BE"
@@ -154,27 +155,68 @@ func buildHomeDashboard(snapshot DebugState) *ui.Element {
 			Child(makeText(statusText).TextColor(statusColor).MarginLeft(6)),
 	)
 
+	depColor := "#F9D17E"
+	if ready {
+		depColor = "#87E9C6"
+	}
+	header = header.Child(
+		makeRow().
+			AlignCenter().
+			Gap(6).
+			MarginTop(8).
+			Child(makeText("依赖状态:").TextColor("#93A0BE")).
+			Child(makeText(fallback(snapshot.DependencyMessage, "未检查依赖状态")).TextColor(depColor)),
+	)
+
+	terminalCard := makeDashboardCard(IconSVGTerminal, "终端", "命令执行与输入输出", EventRouteTerminal).WidthFull().MinHeight(130).Margin(0)
+	fileCard := makeDashboardCard(IconSVGFolderOpen, "文件管理", "浏览与编辑远端文件", EventRouteFileMgr).WidthFull().MinHeight(130).Margin(0)
+	if !ready {
+		terminalCard = terminalCard.Disabled().Opacity(0.45)
+		fileCard = fileCard.Disabled().Opacity(0.45)
+	}
+
 	grid := el(ui.ElementTypeGrid, "").
 		WidthFull().
 		GridTemplateColumns("repeat(auto-fill, minmax(180px, 1fr))").
 		Gap(10).
-		Child(makeDashboardCard(IconSVGTerminal, "终端", "命令执行与输入输出", EventRouteTerminal).WidthFull().MinHeight(130).Margin(0)).
-		Child(makeDashboardCard(IconSVGFolderOpen, "文件管理", "浏览与编辑远端文件", EventRouteFileMgr).WidthFull().MinHeight(130).Margin(0)).
+		Child(terminalCard).
+		Child(fileCard).
 		Child(makeDashboardCard(IconSVGSettings, "核心设置", "设备连接与配置项", EventRouteSettings).WidthFull().MinHeight(130).Margin(0)).
 		Child(makeDashboardCard(IconSVGLogs, "系统日志", "调试日志与导出", EventRouteLogs).WidthFull().MinHeight(130).Margin(0))
+
+	oneClick := makePrimaryButton("一键启动", EventLaunchQA)
+	if !ready {
+		oneClick = oneClick.Disabled().Opacity(0.6)
+	}
 
 	quick := makePanel().
 		Bg("#10172A").
 		Padding(12).
 		Child(makeSectionTitle("快速操作")).
 		Child(
-			makeRow().
+			el(ui.ElementTypeGrid, "").
+				WidthFull().
+				GridTemplateColumns("repeat(auto-fit, minmax(140px, 1fr))").
 				Gap(8).
 				MarginTop(8).
-				Child(makeSecondaryButton("刷新设备", EventDeviceRefresh)).
-				Child(makeSecondaryButton("连接测试", EventHello)).
-				Child(makeSecondaryButton("启动快应用", EventLaunchQA)),
+				Child(makeSecondaryButton("刷新设备", EventDeviceRefresh).WidthFull().MinWidth(0)).
+				Child(makeSecondaryButton("手动刷新依赖", EventDependencyRefresh).WidthFull().MinWidth(0)).
+				Child(oneClick.WidthFull().MinWidth(0)),
+		).
+		Child(
+			makeColumn().
+				WidthFull().
+				Gap(4).
+				MarginTop(8).
+				Child(makeMutedText("目标表盘 " + TargetWatchfaceName + ": " + mapInstallStatus(snapshot.TargetWatchfaceFound))).
+				Child(makeMutedText("目标快应用 " + TargetPackageName + ": " + mapInstallStatus(snapshot.TargetQuickAppFound))),
 		)
+
+	if !ready {
+		quick = quick.Child(
+			makeMutedText("目标表盘或目标快应用缺失时，将禁用终端和文件管理。").MarginTop(8),
+		)
+	}
 
 	root = root.Child(header).Child(grid).Child(quick)
 	return root
@@ -224,4 +266,11 @@ func clipPanelText(value string, max int) string {
 		return value
 	}
 	return value[:max] + "\n...(truncated)"
+}
+
+func mapInstallStatus(installed bool) string {
+	if installed {
+		return "已安装"
+	}
+	return "未安装"
 }

@@ -16,6 +16,12 @@ func ExtractPayloadText(eventPayload string) (string, error) {
 		return "", errEmptyPayload
 	}
 
+	// Fast path: non-JSON payloads are already plain text.
+	first := raw[0]
+	if first != '{' && first != '[' {
+		return raw, nil
+	}
+
 	var wrapper map[string]any
 	if err := json.Unmarshal([]byte(raw), &wrapper); err != nil {
 		return raw, nil

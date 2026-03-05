@@ -1,6 +1,10 @@
 package plugin
 
-import "sync"
+import (
+	timer "astroboxplugin/bindings/astrobox_psys_host_timer"
+	"strings"
+	"sync"
+)
 
 type queueTask struct {
 	name string
@@ -11,6 +15,9 @@ var (
 	taskQueueMu      sync.Mutex
 	taskQueue        []queueTask
 	taskQueueRunning bool
+
+	queueDrainMu        sync.Mutex
+	queueDrainScheduled bool
 )
 
 func EnqueueRpcTask(name string, fn func() error) {
@@ -22,7 +29,48 @@ func EnqueueRpcTask(name string, fn func() error) {
 	withState(func(state *DebugState) {
 		state.TaskQueueLength = queueLen
 	})
+	scheduleQueueDrain()
+}
+
+func scheduleQueueDrain() {
+	queueDrainMu.Lock()
+	if queueDrainScheduled {
+		queueDrainMu.Unlock()
+		return
+	}
+	queueDrainScheduled = true
+	queueDrainMu.Unlock()
+	_ = timer.SetTimeout(10, queueDrainPayload).Read()
+}
+
+func handleQueueDrainPayloadText(payloadText string) bool {
+	if strings.TrimSpace(payloadText) != queueDrainPayload {
+		return false
+	}
+
+	queueDrainMu.Lock()
+	queueDrainScheduled = false
+	queueDrainMu.Unlock()
+
 	DrainTaskQueue()
+
+	if !hasPendingRequest() {
+		taskQueueMu.Lock()
+		needsMore := len(taskQueue) > 0 && !taskQueueRunning
+		taskQueueMu.Unlock()
+		if needsMore {
+			scheduleQueueDrain()
+		}
+	}
+	return true
+}
+
+func handleQueueDrainEventPayload(eventPayload string) bool {
+	text, err := ExtractPayloadText(eventPayload)
+	if err != nil {
+		return false
+	}
+	return handleQueueDrainPayloadText(text)
 }
 
 func DrainTaskQueue() {

@@ -1,7 +1,8 @@
 package plugin
 
 const (
-	TargetPackageName = "com.vela.su.aigik"
+	TargetPackageName   = "com.vela.su.aigik"
+	TargetWatchfaceName = "VelaShellBridge"
 
 	DefaultRpcTimeoutMs   uint64 = 16000
 	DefaultShellTimeoutMs        = 15000
@@ -23,11 +24,12 @@ const (
 
 	DefaultFileDir       = "/data"
 	DefaultDirPageSize   = 100
-	DefaultFsChunkSize   = 4096
+	DefaultFsChunkSize   = 1024
 	DefaultUploadChunk   = 8 * 1024
-	MaxEditorPreviewSize = 1 * 1024 * 1024
+	MaxEditorPreviewSize = 256 * 1024
 	HexPreviewBytes      = 1024
 	LocalDownloadDir     = "downloads"
 
 	timerPayloadPrefix = "rpc_timeout:"
+	queueDrainPayload  = "__queue_drain__"
 )

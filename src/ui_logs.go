@@ -14,9 +14,14 @@ func buildLogsOnlyRoot(snapshot DebugState) *ui.Element {
 		Padding(12).
 		Child(makeSectionTitle("系统日志").MarginRight(4)).
 		Child(makeMutedText(fmt.Sprintf("日志容量: %d / %d", len(snapshot.Logs), MaxLogEntries)).MarginTop(6)).
-		Child(makeRow().Gap(8).MarginTop(8).
-			Child(makeSecondaryButton("导出全部", EventLogExportText).FlexGrow(1)).
-			Child(makeDangerButton("清空日志", EventLogClear).FlexGrow(1)))
+		Child(
+			el(ui.ElementTypeGrid, "").
+				WidthFull().
+				GridTemplateColumns("repeat(auto-fit, minmax(140px, 1fr))").
+				Gap(8).
+				MarginTop(8).
+				Child(makeDangerButton("清空日志", EventLogClear).WidthFull().MinWidth(0)),
+		)
 	root = root.Child(header)
 
 	logPanel := makePanel().Bg("#0D1425").Padding(10)
@@ -54,7 +59,11 @@ func buildLogsOnlyRoot(snapshot DebugState) *ui.Element {
 	logPanel = logPanel.Child(scroll)
 
 	if totalPages > 1 {
-		nav := makeRow().AlignCenter().Gap(8).MarginTop(8)
+		nav := el(ui.ElementTypeGrid, "").
+			WidthFull().
+			GridTemplateColumns("repeat(auto-fit, minmax(100px, 1fr))").
+			Gap(8).
+			MarginTop(8)
 		prev := makeSecondaryButton("上一页", EventLogPagePrev)
 		if currentPage == 0 {
 			prev = prev.Disabled().Opacity(0.4)
@@ -64,9 +73,9 @@ func buildLogsOnlyRoot(snapshot DebugState) *ui.Element {
 			next = next.Disabled().Opacity(0.4)
 		}
 		nav = nav.
-			Child(prev).
-			Child(makeMutedText(fmt.Sprintf("%d / %d", currentPage+1, totalPages))).
-			Child(next)
+			Child(prev.WidthFull().MinWidth(0)).
+			Child(makeMutedText(fmt.Sprintf("%d / %d", currentPage+1, totalPages)).AlignCenter()).
+			Child(next.WidthFull().MinWidth(0))
 		logPanel = logPanel.Child(nav)
 	}
 
