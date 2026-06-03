@@ -1,12 +1,10 @@
 package plugin
 
 import (
-	ui "astroboxplugin/bindings/astrobox_psys_host_ui"
-	pluginEvent "astroboxplugin/bindings/astrobox_psys_plugin_event"
-	"encoding/json"
+	ui "astroboxplugin/bindings/astrobox_psys_host_ui_v3"
+	pluginEvent "astroboxplugin/bindings/astrobox_psys_plugin_event_v3"
 	"fmt"
 	"strings"
-	"unicode"
 )
 
 func OnEvent(eventType pluginEvent.EventType, eventPayload string) string {
@@ -27,9 +25,7 @@ func OnEvent(eventType pluginEvent.EventType, eventPayload string) string {
 			RerenderMainUI()
 		}
 	case pluginEvent.EventTypePluginMessage:
-		if !tryHandleUIEventV3Message(eventPayload) {
-			appendLogf("INFO", "plugin-message: %s", truncateText(eventPayload, 160))
-		}
+		appendLogf("INFO", "plugin-message: %s", truncateText(eventPayload, 160))
 	case pluginEvent.EventTypeDeviceAction:
 		appendLogf("INFO", "device-action: %s", truncateText(eventPayload, 160))
 	case pluginEvent.EventTypeProviderAction:
@@ -44,7 +40,8 @@ func OnEvent(eventType pluginEvent.EventType, eventPayload string) string {
 	return ""
 }
 
-func OnUiEvent(eventID string, event ui.Event, eventPayload string) string {
+func OnUiEventV3(eventID string, event ui.Event, eventPayload string) string {
+	appendLogf("INFO", "OnUiEventV3 called! id=%s, event=%d", eventID, event)
 	HandleUIEvent(eventID, event, eventPayload)
 	if shouldRerenderAfterUIEvent(event, eventID, eventPayload) {
 		RerenderMainUI()
@@ -68,7 +65,11 @@ func shouldRerenderAfterUIEvent(event ui.Event, eventID string, eventPayload str
 		_ = eventPayload
 		return false
 	}
-	if event == ui.EventClick && eventID == EventExecCommand {
+	if event == ui.EventKeyDown {
+		payload, ok := parseUIEventPayload(eventPayload)
+		if ok && strings.EqualFold(payload.Key, "Enter") {
+			return true
+		}
 		return false
 	}
 	return true
@@ -81,80 +82,4 @@ func truncateText(value string, max int) string {
 	return fmt.Sprintf("%s...", value[:max])
 }
 
-type uiEventV3Message struct {
-	Kind         string `json:"kind"`
-	EventID      string `json:"event_id"`
-	EventName    string `json:"event"`
-	EventPayload string `json:"event_payload"`
-}
 
-func tryHandleUIEventV3Message(raw string) bool {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return false
-	}
-
-	var msg uiEventV3Message
-	if err := json.Unmarshal([]byte(raw), &msg); err != nil {
-		return false
-	}
-	if msg.Kind != "ui-event-v3" {
-		return false
-	}
-
-	event, ok := mapUIEventV3NameToLegacy(msg.EventName)
-	if !ok {
-		appendLogf("WARN", "unsupported ui-event-v3 event: %s", msg.EventName)
-		return true
-	}
-
-	HandleUIEvent(msg.EventID, event, msg.EventPayload)
-	if shouldRerenderAfterUIEvent(event, msg.EventID, msg.EventPayload) {
-		RerenderMainUI()
-	}
-	return true
-}
-
-func mapUIEventV3NameToLegacy(eventName string) (ui.Event, bool) {
-	var normalized strings.Builder
-	normalized.Grow(len(eventName))
-	for _, ch := range strings.TrimSpace(eventName) {
-		if ch == '-' || ch == '_' {
-			continue
-		}
-		normalized.WriteRune(unicode.ToUpper(ch))
-	}
-
-	switch normalized.String() {
-	case "CLICK":
-		return ui.EventClick, true
-	case "HOVER":
-		return ui.EventHover, true
-	case "CHANGE":
-		return ui.EventChange, true
-	case "INPUT":
-		return ui.EventInput, true
-	case "FOCUS":
-		return ui.EventFocus, true
-	case "BLUR":
-		return ui.EventBlur, true
-	case "MOUSEENTER":
-		return ui.EventMouseEnter, true
-	case "MOUSELEAVE":
-		return ui.EventMouseLeave, true
-	case "POINTERDOWN":
-		return ui.EventPointerDown, true
-	case "POINTERUP":
-		return ui.EventPointerUp, true
-	case "POINTERMOVE":
-		return ui.EventPointerMove, true
-	case "KEYDOWN":
-		return ui.EventInput, true
-	case "KEYUP":
-		return ui.EventInput, true
-	case "LONGPRESS":
-		return ui.EventClick, true
-	default:
-		return 0, false
-	}
-}

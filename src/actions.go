@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	ui "astroboxplugin/bindings/astrobox_psys_host_ui"
+	ui "astroboxplugin/bindings/astrobox_psys_host_ui_v3"
 
-	"github.com/bytecodealliance/wit-bindgen/wit_types"
+	wit_types "go.bytecodealliance.org/pkg/wit/types"
 )
 
 var tokenPattern = regexp.MustCompile(`^\d{4}$`)
@@ -17,9 +17,10 @@ var tokenPattern = regexp.MustCompile(`^\d{4}$`)
 func HandleUIEvent(eventID string, event ui.Event, eventPayload string) {
 	if event == ui.EventInput || event == ui.EventChange {
 		handleInputChange(eventID, eventPayload)
-		if eventID == EventTerminalKeyDown {
-			handleKeyDown(eventID, eventPayload)
-		}
+		return
+	}
+	if event == ui.EventKeyDown {
+		handleKeyDown(eventID, eventPayload)
 		return
 	}
 

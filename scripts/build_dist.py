@@ -45,6 +45,22 @@ def resolve_adapter(root_dir, cli_adapter):
     sys.exit(1)
 
 
+def resolve_wasm_tools(root_dir):
+    path_val = shutil.which("wasm-tools")
+    if path_val:
+        return path_val
+
+    local_candidates = [
+        root_dir / "tools" / "wasm-tools.exe",
+        root_dir / "tools" / "wasm-tools",
+    ]
+    for candidate in local_candidates:
+        if candidate.exists():
+            return str(candidate)
+
+    return None
+
+
 def build_core_wasm(root_dir, output_path, go_args):
     env = os.environ.copy()
     env["GOOS"] = "wasip1"
@@ -61,12 +77,12 @@ def build_core_wasm(root_dir, output_path, go_args):
     run_command(cmd, root_dir, env=env)
 
 
-def build_component_wasm(root_dir, core_wasm, world, adapter, output_path):
+def build_component_wasm(root_dir, wasm_tools, core_wasm, world, adapter, output_path):
     embedded_path = output_path.with_name("core-with-wit.wasm")
 
     run_command(
         [
-            "wasm-tools",
+            wasm_tools,
             "component",
             "embed",
             "-w",
@@ -81,7 +97,7 @@ def build_component_wasm(root_dir, core_wasm, world, adapter, output_path):
 
     run_command(
         [
-            "wasm-tools",
+            wasm_tools,
             "component",
             "new",
             "--adapt",
@@ -152,7 +168,7 @@ def main():
     )
     parser.add_argument("--release", action="store_true", help="Enable trimpath")
     parser.add_argument("--target", help="Ignored (compatibility option)")
-    parser.add_argument("--world", default="psys-world", help="WIT world name")
+    parser.add_argument("--world", default="psys-world-v3", help="WIT world name")
     parser.add_argument(
         "--adapter",
         help="Path to wasi_snapshot_preview1.reactor.wasm adapter",
@@ -181,8 +197,12 @@ def main():
         sys.stderr.write("go not found in PATH\n")
         sys.exit(1)
 
-    if not shutil.which("wasm-tools"):
-        sys.stderr.write("wasm-tools not found in PATH\n")
+    wasm_tools = resolve_wasm_tools(root_dir)
+    if not wasm_tools:
+        sys.stderr.write(
+            "wasm-tools not found in PATH or tools/ directory.\n"
+            "Please install wasm-tools (e.g. `cargo install wasm-tools` or download and place it in the tools/ directory).\n"
+        )
         sys.exit(1)
 
     if args.target:
@@ -199,7 +219,7 @@ def main():
     component_wasm = build_dir / "component.wasm"
 
     build_core_wasm(root_dir, core_wasm, extra_go_args)
-    build_component_wasm(root_dir, core_wasm, args.world, adapter, component_wasm)
+    build_component_wasm(root_dir, wasm_tools, core_wasm, args.world, adapter, component_wasm)
 
     dist_dir = root_dir / "dist"
     dist_dir.mkdir(parents=True, exist_ok=True)

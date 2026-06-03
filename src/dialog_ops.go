@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bytecodealliance/wit-bindgen/wit_types"
+	wit_types "go.bytecodealliance.org/pkg/wit/types"
 )
 
 const (

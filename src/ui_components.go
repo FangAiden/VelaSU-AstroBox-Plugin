@@ -2,7 +2,7 @@ package plugin
 
 import (
 	ui "astroboxplugin/bindings/astrobox_psys_host_ui_v3"
-	"github.com/bytecodealliance/wit-bindgen/wit_types"
+	wit_types "go.bytecodealliance.org/pkg/wit/types"
 )
 
 func el(t ui.ElementType, content string) *ui.Element {

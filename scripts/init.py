@@ -45,28 +45,36 @@ def ensure_adapter(root):
 
 
 def patch_export_stubs(root):
-    event_stub = root / "bindings" / "export_astrobox_psys_plugin_event" / "wit_bindings.go"
+    event_stub = root / "bindings" / "export_astrobox_psys_plugin_event_v3" / "wit_bindings.go"
     lifecycle_stub = (
         root / "bindings" / "export_astrobox_psys_plugin_lifecycle" / "wit_bindings.go"
     )
 
     if event_stub.is_file():
         event_stub.write_text(
-            """package export_astrobox_psys_plugin_event
+            """package export_astrobox_psys_plugin_event_v3
 
 import (
-\t\"astroboxplugin/bindings/astrobox_psys_host_ui\"
-\t\"astroboxplugin/bindings/astrobox_psys_plugin_event\"
+\t\"astroboxplugin/bindings/astrobox_psys_host_ui_v3\"
+\t\"astroboxplugin/bindings/astrobox_psys_plugin_event_v3\"
 \tplugin \"astroboxplugin/src\"
-\t\"github.com/bytecodealliance/wit-bindgen/wit_types\"
+\t\"go.bytecodealliance.org/pkg/wit/types\"
 )
 
-func OnEvent(eventType astrobox_psys_plugin_event.EventType, eventPayload string) *wit_types.FutureReader[string] {
-\treturn resolveStringFuture(plugin.OnEvent(eventType, eventPayload))
+func OnEvent(eventType astrobox_psys_plugin_event_v3.EventType, eventPayload string) *wit_types.FutureReader[string] {
+\twriter, reader := astrobox_psys_plugin_event_v3.MakeFutureString()
+\tgo func() {
+\t\twriter.Write(plugin.OnEvent(eventType, eventPayload))
+\t}()
+\treturn reader
 }
 
-func OnUiEvent(eventID string, event astrobox_psys_host_ui.Event, eventPayload string) *wit_types.FutureReader[string] {
-\treturn resolveStringFuture(plugin.OnUiEvent(eventID, event, eventPayload))
+func OnUiEventV3(eventID string, event astrobox_psys_host_ui_v3.Event, eventPayload string) *wit_types.FutureReader[string] {
+\twriter, reader := astrobox_psys_plugin_event_v3.MakeFutureString()
+\tgo func() {
+\t\twriter.Write(plugin.OnUiEventV3(eventID, event, eventPayload))
+\t}()
+\treturn reader
 }
 
 func OnUiRender(elementID string) *wit_types.FutureReader[wit_types.Unit] {
@@ -79,16 +87,8 @@ func OnCardRender(cardID string) *wit_types.FutureReader[wit_types.Unit] {
 \treturn resolveUnitFuture()
 }
 
-func resolveStringFuture(value string) *wit_types.FutureReader[string] {
-\twriter, reader := astrobox_psys_plugin_event.MakeFutureString()
-\tgo func() {
-\t\twriter.Write(value)
-\t}()
-\treturn reader
-}
-
 func resolveUnitFuture() *wit_types.FutureReader[wit_types.Unit] {
-\twriter, reader := astrobox_psys_plugin_event.MakeFutureUnit()
+\twriter, reader := astrobox_psys_plugin_event_v3.MakeFutureUnit()
 \tgo func() {
 \t\twriter.Write(wit_types.Unit{})
 \t}()
@@ -168,7 +168,7 @@ def main():
                 "wit-bindgen",
                 "go",
                 "--world",
-                "psys-world",
+                "psys-world-v3",
                 "--pkg-name",
                 "astroboxplugin/bindings",
                 "--generate-stubs",
